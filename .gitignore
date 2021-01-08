@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+venv39/
+venv_/
+keyboards.html
+.idea/
