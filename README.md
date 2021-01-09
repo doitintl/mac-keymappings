@@ -16,3 +16,6 @@ To see the full keymappings in your keyboard, do this:
 7. Copy it to the directory of this project. Rename it to _keylayout.xml_
 8. Run _run.sh_.
 9. This will generate the HTML output and open it.
+
+Sample input can be seen here at [keylayout.html](keylayout.html)
+Sample output can be seen here at [keylayout.html](keylayout.html)
