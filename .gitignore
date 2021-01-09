@@ -129,5 +129,4 @@ dmypy.json
 .pyre/
 venv39/
 venv_/
-keyboards.html
 .idea/

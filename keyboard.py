@@ -2,20 +2,21 @@ import re
 import typing
 import xml.etree.ElementTree as ET
 from unicodedata import name
-
+from typing import *
 from jinja2 import Template
 
-keylayout = 'keylayout'
-keylayout_xml = keylayout + '.xml'
-keylayout_html = keylayout + '.html''keyboards.html'
+keylayout_file = 'keylayout_file'
+keylayout_xml = keylayout_file + '.xml'
+keylayout_html = keylayout_file + '.html'
 TOFU = '\ufffd'
 
 
-def mapindex_by_modifier(map_to_modifier: typing.Dict[int, str], modifier: str) -> int:
+def mapindex_by_modifier(map_to_modifier: Dict[int, str], modifier: str) -> int:
+    '''Get the index (in the XML list) of the keyboard map, given the modifiers that produce that map.'''
     return [k for k, v in map_to_modifier.items() if v == modifier][0]
 
-
-def map_by_index(tree: ET.Element) -> typing.Dict[int, typing.Dict[int, str]]:
+def map_by_index(tree: ET.Element) -> Dict[int, Dict[int, str]]:
+    '''Get the  keyboard map given the index n its XML list, given the modifiers that produce that map.'''
     def to_chr(v: str) -> str:
         return chr(int(v, 16)) if len(v) == 6 else v
 
@@ -28,15 +29,16 @@ def map_by_index(tree: ET.Element) -> typing.Dict[int, typing.Dict[int, str]]:
     return key_maps
 
 
-def modifier_by_mapindex(tree: ET.Element) -> typing.Dict[int, str]:
+def modifier_by_mapindex(tree: ET.Element) -> Dict[int, str]:
+    '''Get the modifiers that produce a keyboard map, given its index in the XML.'''
     def shorten_modifier_descriptions(s: str) -> str:
+        '''Abbreviate the names of the modifiers, using Mac modifier icons. Separate with semicolons.'''
         conversions = {'Shift': '⇧', 'Option': '⌥', 'Command': '⇧', 'Control': '⌃',
                        ' ': '; '}
         for in_, out in conversions.items():
             s = re.sub(in_, out, s, flags=re.IGNORECASE)
 
         return s
-
     keyMapSelects = tree.find("./modifierMap").findall('./keyMapSelect')
     return {
         int(keyMapSelect.attrib['mapIndex']):
@@ -45,13 +47,13 @@ def modifier_by_mapindex(tree: ET.Element) -> typing.Dict[int, str]:
 
 
 def tweaked_xml() -> str:
-    """
-    Reformat entities like &#78e7 as 0x78e7. This is necessary because
-    the XML parser can choke on inability to resolve entities, which
-    we do not want to do anyway.
-    """
-
+    '''Read the XML and fix entity markers.'''
     def remove_entity_markers(xml_s):
+        '''
+        Reformat entities like &#78e7 as 0x78e7. This is necessary because
+        the XML parser can choke on inability to resolve entities, which
+        we do not want to do anyway.
+        '''
         return re.sub(r'&#(x[\dA-F]{4});', r'0\g<1>', xml_s)
 
     with open(keylayout_xml, 'r') as f:
@@ -59,13 +61,15 @@ def tweaked_xml() -> str:
 
 
 def build_table(ascii_keyboard, unmodified_nonasciii_keyboard, map_by_index_,
-                modifier_by_mapindex_: typing.Dict[int, str]):
+                modifier_by_mapindex_: Dict[int, str])-> List[Dict[str, str]]:
 
     def sort_by_asciifirst_and_moddescription_length(modifier_by_mapindex_, ascii_keyboard_):
         modifier_by_map_index_items = list(modifier_by_mapindex_.items())
-        # We are using length of modifiers to sort the keyboards, since a single
-        # modifier is more "common" than multiple modifiers, and NO modifiers
-        # is most common of all. However, we put the ASCII keyboard first.
+        '''
+        We are using length of modifiers to sort the keyboards, since a single
+        modifier is more "common" than multiple modifiers, and NO modifiers
+        is most common of all. However, we put the ASCII keyboard first.
+        '''
         modifier_by_map_index_items.sort(key=lambda item: (item[1].count(';'), item[1]))
         ascii_keyboard_dict = {0: ascii_keyboard_}  # Put it first
         modifier_by_mapindex_ = dict(modifier_by_map_index_items)
@@ -73,6 +77,7 @@ def build_table(ascii_keyboard, unmodified_nonasciii_keyboard, map_by_index_,
         return modifier_by_mapindex_
 
     def unicode_name(s: str) -> str:
+        '''Get the official unicode name for a character.'''
         if not s:
             return ""
         names = []
@@ -84,7 +89,7 @@ def build_table(ascii_keyboard, unmodified_nonasciii_keyboard, map_by_index_,
 
                 names.append(TOFU)  # tofu
 
-        return '& '.join(names)
+        return ' & '.join(names)
 
     modifier_by_mapindex_ = sort_by_asciifirst_and_moddescription_length(modifier_by_mapindex_, ascii_keyboard)
     rows = []
@@ -96,17 +101,15 @@ def build_table(ascii_keyboard, unmodified_nonasciii_keyboard, map_by_index_,
                 if not modifier.strip():
                     modifier = '<NONE>'
                 rows.append({
-                    #  'keyboard_index': idx,
-                    #  'key_index': key_idx,
                     'modifier': modifier,
-                    'ascii': (ascii_keyboard[key_idx]),
-                    'unmodified_non_ascii_key': (unmodified_nonasciii_keyboard[key_idx]),
+                    'ascii': ascii_keyboard[key_idx],
+                    'unmodified_non_ascii_key': unmodified_nonasciii_keyboard[key_idx],
                     'modified_key': modified_key,
                     'unicode_name': unicode_name(modified_key)})
     return rows
 
 
-def render(title, item_list):
+def render(title, rows:List[Dict[str,str]]):
     template = """
         <!DOCTYPE html>
         
@@ -136,7 +139,7 @@ def render(title, item_list):
           </body>
         </html>"""
 
-    rendered = Template(template).render(title=title, item_list=item_list)
+    rendered = Template(template).render(title=title, item_list=rows)
 
     with open(keylayout_html, 'w') as f:
         f.write(rendered)
